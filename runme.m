@@ -1,13 +1,29 @@
+
 steps = [1];
+cluster = ''; % empty for localhost
+%cluster = 'oibserve';
+%cluster = 'discover';
 
 %% Setup
 region = 'WestGrIS';
 
+switch cluster %%{{{
+   case ''
+      md.cluster = generic('name', oshostname(), 'np', 2);
+   case 'oibserve'
+      md.cluster = generic('name', 'oibserve', 'np', 4, ...
+         'login', 'dfelikso', ...
+         'codepath', '', ...
+         'etcpath', '', ...
+         'executionpath', '');
+end
+%%}}}
+
 %% Model parameters
 org = organizer('repository', ['./Models'], 'prefix', [region '_'], 'steps', steps);
 
-%% Processing
-if ~exist(['Exp/' region '.exp'],'file'), % {{{
+%% Processing {{{
+if ~exist(['Exp/' region '.exp'],'file')
    disp(['Domain outline needed: Exp/' region '.exp.'])
 
    s = input('Is there a shapefile that can be used for the model domain (y/n)?','s');
@@ -63,4 +79,6 @@ if perform(org,'Mesh'),% {{{ STEP 1
 	savemodel(org,md);
 
 end %}}}
+
+%%}}}
 
