@@ -19,7 +19,7 @@ md.materials.rheology_law='None';
 
 disp('      boundary conditions for diagnostic model');
 %Create node on boundary fist (because we cannot use mesh)
-md=SetIceShelfBC(md,'./Exp_Par/Front.exp');
+md=SetIceShelfBC(md,'Front.exp');
 md.mask.ice_levelset(:)=-1;
 md.mask.groundedice_levelset(:)=-1;
 pos=find(md.mesh.x<640000.1 & md.mesh.x>639999.9);
@@ -38,6 +38,7 @@ md.basalforcings.meltrate_factor=0;
 md.basalforcings.threshold_thickness=75;
 md.basalforcings.upperdepth_melt=-100;
 md.smb.mass_balance=0.3*ones(md.mesh.numberofvertices,1);
+%md.smb.mass_balance = 0.3 - (0.6 / (max(md.mesh.x)-min(md.mesh.x)) ) .* md.mesh.x;
 md.basalforcings.geothermalflux=0.5*ones(md.mesh.numberofvertices,1);
 md.basalforcings.groundedice_melting_rate=0.*ones(md.mesh.numberofvertices,1);
 
