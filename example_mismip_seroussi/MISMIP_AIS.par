@@ -19,7 +19,7 @@ md.materials.rheology_law='None';
 
 disp('      boundary conditions for diagnostic model');
 %Create node on boundary fist (because we cannot use mesh)
-md=SetIceShelfBC(md,'Front.exp');
+md=SetIceShelfBC(md,'Exp/Front_AIS.exp');
 md.mask.ice_levelset(:)=-1;
 md.mask.groundedice_levelset(:)=-1;
 pos=find(md.mesh.x<640000.1 & md.mesh.x>639999.9);

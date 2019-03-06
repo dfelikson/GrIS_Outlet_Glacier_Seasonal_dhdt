@@ -1,7 +1,6 @@
-steps = [9];
+steps = [2];
 
-modelnum = 1;
-%%{{{
+modelnum = 2;
 switch(modelnum),
 	case 1,  modelname = 'AIS';
 	case 2,  modelname = 'GrIS';
@@ -13,7 +12,7 @@ switch(modelnum),
 	%case 8,  modelname = '250m_coulomb';
 	%case 9,  modelname = '125m_viscous';
 	%case 10, modelname = '125m_coulomb';
-end %%}}}
+end
 
 %Hard coded parameters
 loadonly = 1;
@@ -56,31 +55,32 @@ org=organizer('repository',['./Models_' modelname ],'prefix',['MISMIP_' modelnam
 %Initialization
 if perform(org,'Mesh'),% {{{1
 
-	if modelnum==1 | modelnum==5,
-		md=bamg(model,'domain','Domain.exp','hmax',2000,'splitcorners',1);
-	elseif modelnum==2 | modelnum==6,
-		md=bamg(model,'domain','Domain.exp','hmax',1000,'splitcorners',1);
-	elseif modelnum==3 | modelnum==7,
-		md=bamg(model,'domain','Domain.exp','hmax',500,'splitcorners',1);
-	elseif modelnum==4 | modelnum==8,
-		md=bamg(model,'domain','Domain.exp','hmax',250,'splitcorners',1);
-	elseif modelnum==9 | modelnum==10,
-		md=bamg(model,'domain','Domain.exp','hmax',1000,'splitcorners',1,'maxnbv',4*10^6);
-		hvertices=NaN*ones(md.mesh.numberofvertices,1);
-		pos=find(md.mesh.x>200000 & md.mesh.x<800000);
-		hvertices(pos)=500;
-		pos=find(md.mesh.x>300000 & md.mesh.x<600000);
-		hvertices(pos)=125;
-		md=bamg(md,'hVertices',hvertices,'hmax',1000);
-	elseif modelnum==11,
-		md=bamg(model,'domain','Domain.exp','hmax',500,'splitcorners',1,'maxnbv',4*10^6);
-		hvertices=NaN*ones(md.mesh.numberofvertices,1);
-		pos=find(md.mesh.x>300000 & md.mesh.x<600000);
-		hvertices(pos)=125;
-		md=bamg(md,'hVertices',hvertices,'hmax',500);
-	else
-		error('model not supported yet');
-	end
+   md=bamg(model,'domain',['Exp/Domain_' modelname '.exp'],'hmax',2000,'splitcorners',1);
+	%if modelnum==1 | modelnum==5,
+	%	md=bamg(model,'domain','Domain.exp','hmax',2000,'splitcorners',1);
+	%elseif modelnum==2 | modelnum==6,
+	%	md=bamg(model,'domain','Domain.exp','hmax',1000,'splitcorners',1);
+	%elseif modelnum==3 | modelnum==7,
+	%	md=bamg(model,'domain','Domain.exp','hmax',500,'splitcorners',1);
+	%elseif modelnum==4 | modelnum==8,
+	%	md=bamg(model,'domain','Domain.exp','hmax',250,'splitcorners',1);
+	%elseif modelnum==9 | modelnum==10,
+	%	md=bamg(model,'domain','Domain.exp','hmax',1000,'splitcorners',1,'maxnbv',4*10^6);
+	%	hvertices=NaN*ones(md.mesh.numberofvertices,1);
+	%	pos=find(md.mesh.x>200000 & md.mesh.x<800000);
+	%	hvertices(pos)=500;
+	%	pos=find(md.mesh.x>300000 & md.mesh.x<600000);
+	%	hvertices(pos)=125;
+	%	md=bamg(md,'hVertices',hvertices,'hmax',1000);
+	%elseif modelnum==11,
+	%	md=bamg(model,'domain','Domain.exp','hmax',500,'splitcorners',1,'maxnbv',4*10^6);
+	%	hvertices=NaN*ones(md.mesh.numberofvertices,1);
+	%	pos=find(md.mesh.x>300000 & md.mesh.x<600000);
+	%	hvertices(pos)=125;
+	%	md=bamg(md,'hVertices',hvertices,'hmax',500);
+	%else
+	%	error('model not supported yet');
+	%end
 	md.miscellaneous.name=['MISMIP_' modelname ''];
 
 	savemodel(org,md);
