@@ -1,4 +1,4 @@
-steps = [7];
+steps = [9];
 
 modelnum = 1;
 %%{{{
@@ -251,7 +251,7 @@ if perform(org, 'Retreat_specified1'),% {{{1
    md.transient.ismovingfront = 1;
 
    levelset = md.mask.ice_levelset;
-   filename = 'Retreat3yrAvg.exp';
+   filename = 'Exp/Retreat3yrAvg.exp';
    pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,2));
    levelset(pos) = +1;
 
@@ -314,115 +314,30 @@ if perform(org, 'Retreat_specified2'),% {{{1
    % NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
 
    % Set up seasonal levelsets
-   ds = dir('Retreat*Summer.exp');
+   ds = dir('Exp/Retreat*Summer.exp');
    for i = 1:numel(ds)
-      % Remove ice (summer)
-      filename = ds(i).name;
-      year = str2num(filename(8));
+      % Find last summer
+      years(i) = str2num(ds(i).name(8));
+   end
+   [last_year, last_year_idx] = max(years);
+   
+   % Remove ice (summer)
+   filename = ['Exp/' ds(last_year_idx).name];
+   levelset = md.mask.ice_levelset;
+   pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,2));
+   levelset(pos) = +1;
+   md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + last_year + 0.50];
+      
+   % Find corresponding winter
+   filename_winter = ['Exp/' strrep(ds(last_year_idx).name,'Summer','Winter')];
+   if ~exist(filename_winter,'file')
+      disp('ERROR')
+   else
+      % Remove ice (winter)
       levelset = md.mask.ice_levelset;
-      pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,2));
+      pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
       levelset(pos) = +1;
-      md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 0.50];
-
-      % Find corresponding winter
-      filename_winter = strrep(ds(i).name,'Summer','Winter');
-      if ~exist(filename_winter,'file')
-         disp('ERROR')
-      else
-         % Remove ice (winter)
-         levelset = md.mask.ice_levelset;
-         pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
-         levelset(pos) = +1;
-         md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 1.00];
-      end
-   end
-
-   % Oscillate around the last two (summer/winter) positions until final_time
-   last_spc_time = md.levelset.spclevelset(end,end);
-   while last_spc_time < md.timestepping.final_time
-      levelsets = md.levelset.spclevelset(1:end-1,end-1:end);
-      new_times = [floor(last_spc_time) + 1.50 floor(last_spc_time) + 2.00];
-      md.levelset.spclevelset = [md.levelset.spclevelset [levelsets; new_times]];
-      last_spc_time = md.levelset.spclevelset(end,end);
-   end
-
-   % No calving / no melting
-   md.calving.calvingrate = zeros(md.mesh.numberofvertices,1);
-   md.calving.meltingrate = zeros(md.mesh.numberofvertices,1);
-
-   % Convert to signed distance fields
-   if size(md.levelset.spclevelset,2)>1,
-      disp('Converting levelsets to signed distance fields');
-      for i=1:size(md.levelset.spclevelset,2)
-         levelset = md.levelset.spclevelset(1:end-1,i);
-         pos      = find(levelset<0);
-
-         if exist('./TEMP.exp','file'), delete('./TEMP.exp'); end
-         expcontourlevelzero(md,levelset,0,'./TEMP.exp');
-         levelset = abs(ExpToLevelSet(md.mesh.x,md.mesh.y,'./TEMP.exp'));
-         delete('./TEMP.exp');
-         levelset(pos) = -levelset(pos);
-         md.levelset.spclevelset(1:end-1,i) = levelset;
-      end
-   end
-
-   % Set the requested outputs
-   md.stressbalance.requested_outputs={'default','StrainRatexx','StrainRateyy','StrainRatexy','StrainRateeffective'};
-   md.transient.requested_outputs={'default','IceVolumeAboveFloatation'};
-
-   % Go solve
-   md.verbose.solution=1;
-   md.cluster = cluster;
-   md.settings.waitonlock = waitonlock;
-   md = solve(md,'transient');
-
-   % Save
-   savemodel(org,md);
-
-end % }}}
-if perform(org, 'Retreat_specified3'),% {{{1
-
-   md = loadmodel(org, 'Transient_Steadystate_noFloating_extra');
-
-   % Transfer resuts to model fields
-   md = transientrestart(md);
-   md.timestepping.final_time = md.timestepping.start_time + 50;
-   md.timestepping.time_step = 0.5;
-   md.settings.output_frequency = 1;
-
-   % Activate moving boundary
-   md.transient.ismovingfront = 1;
-
-   % Initialize
-   md.levelset.spclevelset = [md.mask.ice_levelset; md.timestepping.start_time];
-
-   % NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
-   % This will setup the levelset such that the terminus continues to oscillate
-   % (summer/winter) using the last positions.
-   % NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
-
-   % Set up seasonal levelsets
-   ds = dir('Retreat*Summer.exp');
-   for i = 1:numel(ds)
-      % Remove ice (summer)
-      filename = ds(i).name;
-      year = str2num(filename(8));
-      levelset = md.mask.ice_levelset;
-      pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,2));
-      levelset(pos) = +1;
-      md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 0.50];
-
-      % Find corresponding winter
-      filename_winter = strrep(ds(i).name,'Summer','Winter');
-      if ~exist(filename_winter,'file')
-         disp('ERROR')
-      else
-         % Remove ice (winter)
-         levelset = md.mask.ice_levelset;
-         pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
-         levelset(pos) = +1;
-         md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 1.00];
-      end
+      md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + last_year + 1.00];
    end
 
    % Oscillate around the last two (summer/winter) positions until final_time
@@ -490,7 +405,7 @@ if perform(org, 'Retreat_specified4'),% {{{1
    % NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
 
    % Set up seasonal levelsets
-   ds = dir('Retreat*Summer.exp');
+   ds = dir('Exp/Retreat*Summer.exp');
    for i = 1:numel(ds)
       % Remove ice (summer)
       filename = ds(i).name;
@@ -501,7 +416,7 @@ if perform(org, 'Retreat_specified4'),% {{{1
       md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 0.50];
 
       % Find corresponding winter
-      filename_winter = strrep(ds(i).name,'Summer','Winter');
+      filename_winter = ['Exp/' strrep(ds(i).name,'Summer','Winter')];
       if ~exist(filename_winter,'file')
          disp('ERROR')
       else
@@ -559,8 +474,8 @@ end % }}}
 
 %Experiments - melting/calving laws
 
-%Experiments SEP1
 return
+%Experiments SEP1
 if perform(org,'Experiment0'),% {{{1
 
 	md=loadmodel(org,'Transient_Steadystate');
