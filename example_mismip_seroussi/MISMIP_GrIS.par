@@ -1,0 +1,63 @@
+disp('      creating thickness');
+bx=-150-728.8.*(md.mesh.x/300000).^2+343.91.*(md.mesh.x/300000).^4-50.57.*(md.mesh.x/300000).^6;
+by=500./(1+exp(-2/4000.*(md.mesh.y-80000/2-24000)))+500./(1+exp(2/4000.*(md.mesh.y-80000/2+24000)));
+by0=500./(1+exp(-2/4000.*(0-80000/2-24000)))+500./(1+exp(2/4000.*(0-80000/2+24000)));
+md.geometry.bed=max(bx+by,-720);
+md.geometry.surface=max(bx+by0+100,10);
+md.geometry.base=max(md.geometry.bed,-90);
+md.geometry.thickness=md.geometry.surface-md.geometry.base;
+
+disp('      creating drag');
+md.friction.coefficient=sqrt(3.160*10^6)*ones(md.mesh.numberofvertices,1); %q=1.
+md.friction.p=3*ones(md.mesh.numberofelements,1);
+md.friction.q=zeros(md.mesh.numberofelements,1);
+
+disp('      creating flow law paramter');
+md.materials.rheology_B=1/((6.338*10^-25)^(1/3))*ones(md.mesh.numberofvertices,1);
+md.materials.rheology_n=3*ones(md.mesh.numberofelements,1);
+md.materials.rheology_law='None';
+
+disp('      boundary conditions for diagnostic model');
+%Create node on boundary fist (because we cannot use mesh)
+md=SetIceShelfBC(md,'Front.exp');
+md.mask.ice_levelset(:)=-1;
+md.mask.groundedice_levelset(:)=-1;
+pos=find(md.mesh.x<640000.1 & md.mesh.x>639999.9);
+md.mask.ice_levelset(pos)=0;
+md.stressbalance.spcvx(:)=NaN;
+md.stressbalance.spcvy(:)=NaN;
+pos=find((md.mesh.y<80000.1 & md.mesh.y>79999.9) | (md.mesh.y<0.1 & md.mesh.y>-0.1));
+md.stressbalance.spcvy(pos)=0;
+pos2=find(md.mesh.x<0.1 & md.mesh.x>-0.1);
+md.stressbalance.spcvx(pos2)=0;
+md.stressbalance.spcvy(pos2)=0;
+
+disp('      forcing conditions');
+md.basalforcings=mismipbasalforcings(md);
+md.basalforcings.meltrate_factor=0;
+md.basalforcings.threshold_thickness=75;
+md.basalforcings.upperdepth_melt=-100;
+md.smb.mass_balance=0.3*ones(md.mesh.numberofvertices,1);
+%md.smb.mass_balance = 0.3 - (0.6 / (max(md.mesh.x)-min(md.mesh.x)) ) .* md.mesh.x;
+md.basalforcings.geothermalflux=0.5*ones(md.mesh.numberofvertices,1);
+md.basalforcings.groundedice_melting_rate=0.*ones(md.mesh.numberofvertices,1);
+
+md.thermal.spctemperature=NaN*ones(md.mesh.numberofvertices,1);
+md.groundingline.migration='SubelementMigration';
+
+%Parameters
+md.materials.rho_ice=918;
+md.materials.rho_water=1028;
+md.constants.g=9.8;
+md.constants.yts=31556926;
+md.transient.isthermal=0;
+md.transient.isgroundingline=1;
+md.stressbalance.isnewton=0;
+
+%Initialization
+md.initialization.vx=ones(md.mesh.numberofvertices,1);
+md.initialization.vy=ones(md.mesh.numberofvertices,1);
+md.initialization.vz=ones(md.mesh.numberofvertices,1);
+md.initialization.vel=sqrt(2)*ones(md.mesh.numberofvertices,1);
+md.initialization.pressure=md.constants.g*md.materials.rho_ice*md.geometry.thickness;
+md.initialization.temperature=273*ones(md.mesh.numberofvertices,1);
