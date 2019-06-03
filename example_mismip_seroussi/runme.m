@@ -8,7 +8,7 @@ addpath '/Users/dfelikso/Research/Projects/GrIS_Calibrated_SLR/issm';
 % GrIS
 % 1. re-run the Transient_Steadystate_noFloating_extra to ACTUALLY get it to steady-state and then re-run the rest of the steps
 
-steps = [8];
+steps = [12];
 
 modelnum = 2;
 switch(modelnum),
@@ -35,7 +35,7 @@ switch clusterName %%{{{
       waitonlock = 10;
 
    case 'oibserve'
-      cluster = generic('name', 'gs615-oibserve.ndc.nasa.gov', 'np', 6, ...
+      cluster = generic('name', 'gs615-oibserve.ndc.nasa.gov', 'np', 12, ...
          'login', 'dfelikso', ...
          'codepath', '/home/dfelikso/Software/ISSM/trunk-jpl/bin', ...
          'etcpath', '/home/dfelikso/Software/ISSM/trunk-jpl/etc', ...
@@ -265,15 +265,31 @@ if perform(org, 'Transient_Steadystate_noFloating_extra'),% {{{1 STEP 5
 end % }}}
 
 %Experiments - specified terminus positions
-experiment_style = 1;
+experiment_style = 3;
 switch experiment_style
    case 1
       retreat_3yrAvg_positions  = [26000 25000 24000];
       retreat_3yrSummer_offsets = [  500   500   500];
       retreat_3yrWinter_offsets = [  500   500   500];
    case 2
+      retreat_3yrAvg_positions  = [26000 25000 24000];
+      retreat_3yrSummer_offsets = [  500   500   500];
+      retreat_3yrWinter_offsets = [  100   100   100];
+   case 3
+      retreat_3yrAvg_positions  = [26000 25000 24000];
+      retreat_3yrSummer_offsets = [  100   100   100];
+      retreat_3yrWinter_offsets = [  500   500   500];
+   case 4
       retreat_3yrAvg_positions  = [24000 22000 20000];
       retreat_3yrSummer_offsets = [  500   500   500];
+      retreat_3yrWinter_offsets = [  500   500   500];
+   case 5
+      retreat_3yrAvg_positions  = [24000 22000 20000];
+      retreat_3yrSummer_offsets = [  500   500   500];
+      retreat_3yrWinter_offsets = [  100   100   100];
+   case 6
+      retreat_3yrAvg_positions  = [24000 22000 20000];
+      retreat_3yrSummer_offsets = [  100   100   100];
       retreat_3yrWinter_offsets = [  500   500   500];
 end
 
@@ -283,7 +299,7 @@ if perform(org, ['Retreat_specified1_experiment' num2str(experiment_style)]),% {
 
    % Transfer resuts to model fields
    md = transientrestart(md);
-   md.timestepping.final_time = md.timestepping.start_time + 10;
+   md.timestepping.final_time = md.timestepping.start_time + 25;
    md.timestepping.time_step = 0.01;
    md.settings.output_frequency = 25;
 
@@ -338,7 +354,7 @@ if perform(org, ['Retreat_specified2_experiment' num2str(experiment_style)]),% {
 
    % Transfer resuts to model fields
    md = transientrestart(md);
-   md.timestepping.final_time = md.timestepping.start_time + 10;
+   md.timestepping.final_time = md.timestepping.start_time + 25;
    md.timestepping.time_step = 0.01;
    md.settings.output_frequency = 25;
 
@@ -366,25 +382,21 @@ if perform(org, ['Retreat_specified2_experiment' num2str(experiment_style)]),% {
    levelset = md.mask.ice_levelset;
    pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,2));
    levelset(pos) = +1;
-   md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + 3.50];
+   md.levelset.spclevelset(:,end+1) = [levelset; round(md.timestepping.start_time) + 3.50];
       
    % Find corresponding winter
-   filename_winter = ['Exp/' modelname '_Retreat3yrWinter_x' num2str(retreat_3yrAvg_positions(3)) '+' num2str(retreat_3yrSummer_offsets(3)) '.exp'];
-   if ~exist(filename_winter,'file')
-      disp('ERROR')
-   else
-      % Remove ice (winter)
-      levelset = md.mask.ice_levelset;
-      pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
-      levelset(pos) = +1;
-      md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + 4.00];
-   end
+   filename_winter = ['Exp/' modelname '_Retreat3yrWinter_x' num2str(retreat_3yrAvg_positions(3)) '+' num2str(retreat_3yrWinter_offsets(3)) '.exp'];
+   % Remove ice (winter)
+   levelset = md.mask.ice_levelset;
+   pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
+   levelset(pos) = +1;
+   md.levelset.spclevelset(:,end+1) = [levelset; round(md.timestepping.start_time) + 4.00];
 
    % Oscillate around the last two (summer/winter) positions until final_time
    last_spc_time = md.levelset.spclevelset(end,end);
    while last_spc_time < md.timestepping.final_time
       levelsets = md.levelset.spclevelset(1:end-1,end-1:end);
-      new_times = [floor(last_spc_time) + 1.50 floor(last_spc_time) + 2.00];
+      new_times = [floor(last_spc_time) + 0.50 floor(last_spc_time) + 1.00];
       md.levelset.spclevelset = [md.levelset.spclevelset [levelsets; new_times]];
       last_spc_time = md.levelset.spclevelset(end,end);
    end
@@ -429,7 +441,7 @@ if perform(org, ['Retreat_specified4_experiment' num2str(experiment_style)]),% {
 
    % Transfer resuts to model fields
    md = transientrestart(md);
-   md.timestepping.final_time = md.timestepping.start_time + 10;
+   md.timestepping.final_time = md.timestepping.start_time + 25;
    md.timestepping.time_step = 0.01;
    md.settings.output_frequency = 25;
 
@@ -451,26 +463,22 @@ if perform(org, ['Retreat_specified4_experiment' num2str(experiment_style)]),% {
       levelset = md.mask.ice_levelset;
       pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,2));
       levelset(pos) = +1;
-      md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 0.50];
+      md.levelset.spclevelset(:,end+1) = [levelset; round(md.timestepping.start_time) + year + 0.50];
 
       % Find corresponding winter
-      filename_winter = ['Exp/' modelname '_Retreat' num2str(year) 'yrWinter_x' num2str(retreat_3yrAvg_positions(year)) '+' num2str(retreat_3yrSummer_offsets(year)) '.exp'];
-      if ~exist(filename_winter,'file')
-         disp('ERROR')
-      else
-         % Remove ice (winter)
-         levelset = md.mask.ice_levelset;
-         pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
-         levelset(pos) = +1;
-         md.levelset.spclevelset(:,end+1) = [levelset; md.timestepping.start_time + year + 1.00];
-      end
+      filename_winter = ['Exp/' modelname '_Retreat' num2str(year) 'yrWinter_x' num2str(retreat_3yrAvg_positions(year)) '+' num2str(retreat_3yrWinter_offsets(year)) '.exp'];
+      % Remove ice (winter)
+      levelset = md.mask.ice_levelset;
+      pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename_winter,2));
+      levelset(pos) = +1;
+      md.levelset.spclevelset(:,end+1) = [levelset; round(md.timestepping.start_time) + year + 1.00];
    end
 
    % Oscillate around the last two (summer/winter) positions until final_time
    last_spc_time = md.levelset.spclevelset(end,end);
    while last_spc_time < md.timestepping.final_time
       levelsets = md.levelset.spclevelset(1:end-1,end-1:end);
-      new_times = [floor(last_spc_time) + 1.50 floor(last_spc_time) + 2.00];
+      new_times = [floor(last_spc_time) + 0.50 floor(last_spc_time) + 1.00];
       md.levelset.spclevelset = [md.levelset.spclevelset [levelsets; new_times]];
       last_spc_time = md.levelset.spclevelset(end,end);
    end
@@ -511,9 +519,6 @@ if perform(org, ['Retreat_specified4_experiment' num2str(experiment_style)]),% {
 end % }}}
 
 %Experiments - melting/calving laws
-melt_rate_max = 12;
-meltingrate_monthly = melt_rate_max * [0 0 0 0 1/3 2/3 3/3 2/3 1/3 0 0 0];
-meltingrate_annual  = mean(meltingrate_monthly);
 if perform(org,'Calving_Steadystate'),% {{{
 
 	md = loadmodel(org,'Transient_Steadystate_noFloating');
@@ -577,6 +582,10 @@ if perform(org,'Calving_Steadystate'),% {{{
 
    savemodel(org,md);
 end%}}}
+
+melt_rate_max = 12;
+meltingrate_monthly = melt_rate_max * [0 0 0 0 1/3 2/3 3/3 2/3 1/3 0 0 0];
+meltingrate_annual  = mean(meltingrate_monthly);
 if perform(org,['Calving_monthly_maxMeltRate' num2str(melt_rate_max)]),% {{{
 
 	md = loadmodel(org,'Calving_Steadystate');
@@ -727,9 +736,9 @@ if perform(org,['Calving_annual_maxMeltRate' num2str(melt_rate_max)]),% {{{
 end%}}}
 
 melt_rate_pulse = 50;
-melt_rate_pulse_start_time = 2.4; % melt pulse will be "inserted" at this time ...
+melt_rate_pulse_start_time = 2.7; % melt pulse will be "inserted" at this time ...
 melt_rate_pulse_duration  = 0.02; % ... and maintained for this duration
-if perform(org,['Calving_monthly_maxMeltRate' num2str(melt_rate_max) '_meltPulse_time' num2str(melt_rate_pulse_start_time) '_duration' num2str(melt_rate_pulse_duration)]),% {{{
+if perform(org,['Calving_monthly_maxMeltRate' num2str(melt_rate_max) '_meltPulse' num2str(melt_rate_pulse) '_time' num2str(melt_rate_pulse_start_time) '_duration' num2str(melt_rate_pulse_duration)]),% {{{
 
 	md = loadmodel(org,'Calving_Steadystate');
 
@@ -737,7 +746,7 @@ if perform(org,['Calving_monthly_maxMeltRate' num2str(melt_rate_max) '_meltPulse
 	md = transientrestart(md);
 
    % Set start/end times and timestep
-   md.timestepping.final_time = md.timestepping.start_time + 10;
+   md.timestepping.final_time = md.timestepping.start_time + 25;
    md.timestepping.time_step = 0.01;
    md.settings.output_frequency = 10;
 
@@ -750,8 +759,8 @@ if perform(org,['Calving_monthly_maxMeltRate' num2str(melt_rate_max) '_meltPulse
    pos = find(md.mesh.vertexonboundary);
    md.levelset.spclevelset(pos) = md.mask.ice_levelset(pos);
    %FIXME
-   pos = find(md.geometry.bed>0);
-   md.levelset.spclevelset(pos) = md.mask.ice_levelset(pos);
+   %pos = find(md.geometry.bed>0);
+   %md.levelset.spclevelset(pos) = md.mask.ice_levelset(pos);
    %FIXME
    md.calving = calvingvonmises();
    md.calving.meltingrate = zeros(md.mesh.numberofvertices,1);
@@ -873,6 +882,57 @@ if perform(org,['Calving_annual_maxMeltRate' num2str(melt_rate_max) '_meltPulse_
 
    savemodel(org,md);
 end%}}}
+
+if perform(org, 'Retreat_specifiedFromCalving'),% {{{1
+
+   md = loadmodel(org, 'Calving_Steadystate');
+   md_calving = loadmodel(org, ['Calving_annual_maxMeltRate' num2str(melt_rate_max)]);
+
+   % Transfer resuts to model fields
+   md = transientrestart(md);
+   md.timestepping.final_time = md.timestepping.start_time + 10;
+   md.timestepping.time_step = 0.01;
+   md.settings.output_frequency = 10;
+
+   % Activate moving boundary
+   md.transient.ismovingfront = 1;
+
+   % Copy spclevelset from results of calving experiment
+   md.levelset.spclevelset = [md_calving.results.TransientSolution(:).MaskIceLevelset; md_calving.results.TransientSolution(:).time];
+   md.calving = calving();
+   md.calving.calvingrate = zeros(md.mesh.numberofvertices,1);
+   md.calving.meltingrate = zeros(md.mesh.numberofvertices,1);
+
+   % Convert to signed distance fields
+   if size(md.levelset.spclevelset,2)>1,
+      disp('Converting levelsets to signed distance fields');
+      for i=1:size(md.levelset.spclevelset,2)
+         levelset = md.levelset.spclevelset(1:end-1,i);
+         pos      = find(levelset<0);
+
+         if exist('./TEMP.exp','file'), delete('./TEMP.exp'); end
+         expcontourlevelzero(md,levelset,0,'./TEMP.exp');
+         levelset = abs(ExpToLevelSet(md.mesh.x,md.mesh.y,'./TEMP.exp'));
+         delete('./TEMP.exp');
+         levelset(pos) = -levelset(pos);
+         md.levelset.spclevelset(1:end-1,i) = levelset;
+      end
+   end
+
+   % Set the requested outputs
+   md.stressbalance.requested_outputs={'default','StrainRatexx','StrainRateyy','StrainRatexy','StrainRateeffective'};
+   md.transient.requested_outputs={'default','IceVolumeAboveFloatation'};
+
+   % Go solve
+   md.verbose.solution=1;
+   md.cluster = cluster;
+   md.settings.waitonlock = waitonlock;
+   md = solve(md,'transient');
+
+   % Save
+   savemodel(org,md);
+
+end % }}}
 
 return
 if perform(org,'TransientCalving'),% {{{
