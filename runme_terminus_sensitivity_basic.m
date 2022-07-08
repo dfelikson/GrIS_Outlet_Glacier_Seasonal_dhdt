@@ -71,3 +71,48 @@ md = solve(md,'Stressbalance');
 
 % Save
 savemodel(org,md);
+
+
+%% Relaxation
+%Put results of inversion back into the model for forward runs
+md.friction.coefficient=md.results.StressbalanceSolution.FrictionCoefficient;
+
+% Special post-processing of inverted friction coefficient
+filename = ['Exp/' region '_coeffront_after_inversion.exp'];
+if exist(filename, 'file')
+  pos = find(ContourToNodes(md.mesh.x, md.mesh.y, filename, 1));
+  md.friction.coefficient(pos) = 10;
+end
+
+md.initialization.pressure = zeros(md.mesh.numberofvertices,1);
+md.initialization.temperature = 250*ones(md.mesh.numberofvertices,1);
+
+% Set parameters
+md.inversion.iscontrol=0;
+md.timestepping.start_time = start_year;
+md.timestepping.time_step  = .02;
+md.timestepping.final_time = start_year + relaxation_years;
+md.settings.output_frequency = (1/md.timestepping.time_step)/5; % 5/yr
+
+% We set the transient parameters
+md.transient.ismovingfront=0;
+md.transient.isthermal=0;
+md.transient.isstressbalance=1;
+md.transient.ismasstransport=1;
+md.transient.isgroundingline=1;
+md.groundingline.migration = 'SubelementMigration';
+
+% We set the calving model (no moving front ... spclevelset is actually ignored)
+md.levelset.spclevelset = md.levelset.spclevelset;
+md.calving.calvingrate = zeros(md.mesh.numberofvertices,1);
+md.calving.meltingrate = zeros(md.mesh.numberofvertices,1);
+
+% Set the requested outputs
+md.stressbalance.requested_outputs={'default'};
+md.transient.requested_outputs={'default'};
+
+% Go solve
+md.verbose.solution=1;
+md.cluster = cluster;
+md.settings.waitonlock = waitonlock;
+md = solve(md,'transient');
