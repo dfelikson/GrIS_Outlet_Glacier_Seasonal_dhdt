@@ -1,0 +1,27 @@
+#!/usr/bin/bash
+#export ISSM_DIR="/efs/issm/issm/trunk-jpl-denis"
+#export ISSM_EXT_DIR="/efs/issm-ext"
+# New installation of ISSM (Sept 15 2022)
+export ISSM_DIR="/efs/issm/issm/trunk-jpl-denis-new"
+export ISSM_EXT_DIR="/efs/issm-new/python-modules/ext"
+
+export PYTHONPATH="$ISSM_DIR/src/m/dev"
+export PYTHONSTARTUP="$PYTHONPATH/devpath.py"
+
+if [ ! /home/jovyan/.ipython/profile_default/startup/devpath.py ]; then
+        ln -s $ISSM_DIR"/src/m/dev/devpath.py" /home/jovyan/.ipython/profile_default/startup/devpath.py
+fi
+
+source $ISSM_DIR/etc/environment.sh
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PYTHONPATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ISSM_DIR/lib
+
+#alias issm-python-env="source "${ISSM_DIR}"/etc/environment.sh; if [ -z "${LD_LIBRARY_PATH}" ]; then export LD_LIBRARY_PATH="/usr/local/lib"; elif [[ ":${LD_LIBRARY_PATH}:" != *":/usr/local/lib:"* ]]; then export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib"; fi; export PYTHONPATH="${ISSM_DIR}"/src/m/dev; export PYTHONSTARTUP="${PYTHONPATH}"/devpath.py; export PYTHONUNBUFFERED=1; cd "${ISSM_DIR}"/test/NightlyRun"
+if [ -z "${LD_LIBRARY_PATH}" ]; then
+	export LD_LIBRARY_PATH="/usr/local/lib"
+elif [[ ":${LD_LIBRARY_PATH}:" != *":/usr/local/lib:"* ]]; then
+	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib"
+fi
+export PYTHONPATH="${ISSM_DIR}"/src/m/dev
+export PYTHONSTARTUP="${PYTHONPATH}"/devpath.py
+export PYTHONUNBUFFERED=1
