@@ -8,7 +8,7 @@ export ISSM_EXT_DIR="/efs/issm-new/python-modules/ext"
 export PYTHONPATH="$ISSM_DIR/src/m/dev"
 export PYTHONSTARTUP="$PYTHONPATH/devpath.py"
 
-if [ ! /home/jovyan/.ipython/profile_default/startup/devpath.py ]; then
+if [ ! -f /home/jovyan/.ipython/profile_default/startup/devpath.py ]; then
         ln -s $ISSM_DIR"/src/m/dev/devpath.py" /home/jovyan/.ipython/profile_default/startup/devpath.py
 fi
 
