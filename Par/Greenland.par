@@ -4,6 +4,13 @@ glaciers   = evalin('base', 'glaciers');
 start_year = evalin('base', 'start_year');
 end_year   = evalin('base', 'end_year');
 
+surface_select = evalin('base', 'surface_select');
+velocity_select = evalin('base', 'velocity_select');
+velocity_scalefactor_MEaSUREs = evalin('base', 'velocity_scalefactor_MEaSUREs');
+
+fill_nunataks = evalin('base', 'fill_nunataks');
+ice_temp = evalin('base', 'ice_temp');
+
 % Geometry
 switch region
    case 'KAK' %%{{{
@@ -105,25 +112,6 @@ switch region
       % Viscocity
       ice_temp = -10; % deg C
    %%}}}
-   case {'WestGrIS', 'SAtoES'} %%{{{
-      surface_select = 'AERO+GIMP';
-      velocity_select = 'UCI';
-      velocity_select_years = [1991 1992 1993 1995];
-      velocity_select_years = 1997;
-      velocity_scalefactor_MEaSUREs = 1.00;
-
-      %extend_ice_mask_to_earliest_terminus = true;
-
-      fill_nunataks = false;
-
-      % SMB
-      smb_source = 'RACMO';
-      smb_type = 'yearly';
-      smb_datayears = start_year:end_year;
-
-      % Viscocity
-      ice_temp = -10; % deg C
-   %%}}}
 end
 
 % --- Parameters ------------------------------------------
@@ -189,42 +177,42 @@ md.geometry.thickness = md.geometry.surface - md.geometry.bed;
 disp('   Interpolating mask');
 % 0 = ocean, 1 = ice-free land, 2 = grounded ice, 3 = floating ice, 4 = non-Greenland land
 md.mask.ice_levelset         = -1*ones(md.mesh.numberofvertices,1);
-md.mask.groundedice_levelset = -1*ones(md.mesh.numberofvertices,1);
+%md.mask.groundedice_levelset = -1*ones(md.mesh.numberofvertices,1);
 mask = interpBedmachineGreenland(md.mesh.x,md.mesh.y,'mask');
 pos = find(mask<2);
 md.mask.ice_levelset(pos)=1;
 
-% Find minimum ice extent and remove ice from original mask to initialize the levelset
-levelset_min_extent = md.mask.ice_levelset;
-for iglacier = 1:numel(glaciers)
-   glacier_name = glaciers{iglacier};
-   glacier_long_name = glacier_name_translator(glacier_name, 'terminus_name', 'centerline_name');
-   glacier_abbr = glacier_name_translator(glacier_name, 'terminus_name', 'terminus_abbr');
-
-   exp_min_extent = ['Exp/' glacier_long_name '_TerminusMinExtent.exp'];
-   pos = find(ContourToNodes(md.mesh.x,md.mesh.y,exp_min_extent,2));
-   levelset_min_extent(pos) = +1;
-end
-md.mask.ice_levelset = levelset_min_extent;
-
-% Find initial extent and add ice to mask
-levelset_0 = md.mask.ice_levelset;
-for iglacier = 1:numel(glaciers)
-   glacier_name = glaciers{iglacier};
-   glacier_long_name = glacier_name_translator(glacier_name, 'terminus_name', 'centerline_name');
-   d = dir(sprintf('Exp/%s_Front0.exp', glacier_long_name));
-   if numel(d) == 1
-      filename = [d.folder '/' d.name];
-      disp(['   -- Extending ice mask to retreated ice using ' filename])
-      pos = ContourToNodes(md.mesh.x,md.mesh.y,filename,2); % finds nodes inside the "retreated portion"
-      %mask(mask==0 & pos) = 2; % if MC bed mask has ocean (==0) and we're inside the "retreated portion", set to ice (==2)
-      levelset_0(find(pos)) = -1;
-   else
-      error('PROBLEM');
-   end
-end
-md.mask.ice_levelset = levelset_0;
-fprintf('\n');
+% % Find minimum ice extent and remove ice from original mask to initialize the levelset
+% levelset_min_extent = md.mask.ice_levelset;
+% for iglacier = 1:numel(glaciers)
+%    glacier_name = glaciers{iglacier};
+%    glacier_long_name = glacier_name_translator(glacier_name, 'terminus_name', 'centerline_name');
+%    glacier_abbr = glacier_name_translator(glacier_name, 'terminus_name', 'terminus_abbr');
+% 
+%    exp_min_extent = ['Exp/' glacier_long_name '_TerminusMinExtent.exp'];
+%    pos = find(ContourToNodes(md.mesh.x,md.mesh.y,exp_min_extent,2));
+%    levelset_min_extent(pos) = +1;
+% end
+% md.mask.ice_levelset = levelset_min_extent;
+% 
+% % Find initial extent and add ice to mask
+% levelset_0 = md.mask.ice_levelset;
+% for iglacier = 1:numel(glaciers)
+%    glacier_name = glaciers{iglacier};
+%    glacier_long_name = glacier_name_translator(glacier_name, 'terminus_name', 'centerline_name');
+%    d = dir(sprintf('Exp/%s_Front0.exp', glacier_long_name));
+%    if numel(d) == 1
+%       filename = [d.folder '/' d.name];
+%       disp(['   -- Extending ice mask to retreated ice using ' filename])
+%       pos = ContourToNodes(md.mesh.x,md.mesh.y,filename,2); % finds nodes inside the "retreated portion"
+%       %mask(mask==0 & pos) = 2; % if MC bed mask has ocean (==0) and we're inside the "retreated portion", set to ice (==2)
+%       levelset_0(find(pos)) = -1;
+%    else
+%       error(['Could not find file: ' sprintf('Exp/%s_Front0.exp', glacier_long_name)]);
+%    end
+% end
+% md.mask.ice_levelset = levelset_0;
+% fprintf('\n');
 
 % Check for stranded ice (solitary nodes that are ice surrounded by not ice)
 %[stranded_nodes clean_mask_or_levelset] = remove_stranded_ice_spclevelset(md,'ice_levelset');
@@ -234,10 +222,10 @@ fprintf('\n');
 %              '\033[' '103;30' 'm            to check and adjust Front0 exp file. \033[0m \n\n']);
 %end
 
-% Set the grounded ice mask to the ice mask ... later, we'll determine what's floating based on the thickness + bed
+% Set the ocean mask to the negative of the ice mask ... later, we'll determine what's floating based on the thickness + bed
 %pos = find(mask==0 | mask==3);
 %md.mask.groundedice_levelset(pos)=-1;
-md.mask.groundedice_levelset=-md.mask.ice_levelset;
+md.mask.ocean_levelset=-md.mask.ice_levelset;
 
 % Fill nunataks with 10 m of ice to provide some "lateral drag" in the model
 %%{{{
@@ -251,7 +239,7 @@ if fill_nunataks
 
    % Change ice mask there
    md.mask.ice_levelset(nunataks)         = -1;
-   md.mask.groundedice_levelset(nunataks) = +1;
+   %md.mask.groundedice_levelset(nunataks) = +1;
 end
 %%}}}
 
@@ -277,8 +265,8 @@ md.geometry.base=md.geometry.surface-md.geometry.thickness;
 
 disp('      -- ice shelf base based on hydrostatic equilibrium');
 di=md.materials.rho_ice/md.materials.rho_water;
-md.mask.groundedice_levelset=md.geometry.thickness+md.geometry.bed/di;
-pos = find(md.mask.groundedice_levelset<0); % & md.mask.ice_levelset<0);
+shelf=md.geometry.thickness+md.geometry.bed/di;
+pos = find(shelf<0); % & md.mask.ice_levelset<0);
 md.geometry.surface(pos)= md.geometry.thickness(pos)*(md.materials.rho_water-md.materials.rho_ice)/md.materials.rho_water;
 md.geometry.base = md.geometry.surface - md.geometry.thickness;
 %surface_floating = md.geometry.surface;
@@ -292,7 +280,26 @@ disp ' '
 %%{{{ Velocity
 fprintf(['\n\033[33m   Velocity \033[0m \n\n']);
 %Get observed velocity field on mesh nodes
-if strfind(velocity_select,'MEaSUREs')
+if strfind(velocity_select,'ITS_LIVE')
+   if length(velocity_select) == 8
+      disp(['      -- Loading ITS_LIVE velocity']);
+      [velx, vely] = interpITS_LIVE(md.mesh.x,md.mesh.y);
+
+   else
+      year = velocity_select(9:12);
+      disp(['      -- Loading ITS_LIVE velocity, year ' year]);
+      [velx, vely] = interpITS_LIVE(md.mesh.x,md.mesh.y,year);
+
+      invalid = isnan(velx) & md.mask.ice_levelset<0;
+      if sum(invalid) > 0
+         %[velx_mosaic, vely_mosaic] = interpITS_LIVE(md.mesh.x,md.mesh.y);
+         [velx_mosaic, vely_mosaic] = interpJoughinCompositeGreenland(md.mesh.x,md.mesh.y);
+         velx(invalid) = velx_mosaic(invalid);
+         vely(invalid) = vely_mosaic(invalid);
+      end
+   end
+
+elseif strfind(velocity_select,'MEaSUREs')
    if length(velocity_select) == 8
       disp('      -- Loading MEaSUREs velocity composite');
       [velx, vely] = interpJoughinCompositeGreenland(md.mesh.x,md.mesh.y);
@@ -359,6 +366,29 @@ else
 
 end
 
+%% If there is still no data for some ice nodes, fill in with nearest neighbor interp
+%valid = ~isnan(velx) & md.mask.ice_levelset<0;
+%velx_valid = velx(valid);
+%vely_valid = vely(valid);
+%invalid = isnan(velx) & md.mask.ice_levelset<0;
+%if sum(invalid) > 0
+%   pos = find(invalid);
+%   for i = 1:length(pos)
+%      distances = sqrt( (md.mesh.x(pos(i)) - md.mesh.x(valid)).^2 + (md.mesh.y(pos(i)) - md.mesh.y(valid)).^2 );
+%      [~, idx] = min(distances);
+%      velx(pos(i)) = velx_valid(idx);
+%      vely(pos(i)) = vely_valid(idx);
+%   end
+%end
+
+vel = sqrt(velx.^2 + vely.^2);
+vel_elements = vel(md.mesh.elements);
+pos = find( (sum(vel_elements == 0 | isnan(vel_elements) , 2)) > 0);
+pos = reshape(md.mesh.elements(pos,:),[],1);
+velx(pos) = 0;
+vely(pos) = 0;
+md.inversion.thickness_obs = md.geometry.thickness;
+md.inversion.surface_obs = md.geometry.surface;
 md.inversion.vx_obs=velx;
 md.inversion.vy_obs=vely;
 pos=find(isnan(md.inversion.vx_obs) | isnan(md.inversion.vy_obs));
@@ -369,6 +399,7 @@ md.initialization.vx  = md.inversion.vx_obs;
 md.initialization.vy  = md.inversion.vy_obs;
 md.initialization.vz  = zeros(md.mesh.numberofvertices,1);
 md.initialization.vel = md.inversion.vel_obs;
+
 %%}}}
 disp ' '
 
@@ -399,13 +430,19 @@ vel=max(vel,0.1);
 disp('      -- Calculate effective pressure');
 Neff = md.materials.rho_ice*md.geometry.thickness+md.materials.rho_water*md.geometry.base;
 Neff(find(Neff<=0))=1;
+% -- NOTE --
+Neff=max(Neff,5e4);
+pos1 = find(Neff==5e4 & vel <100 & md.mask.ice_levelset<0);
+pos2 = find(Neff >5e4 & vel>=100 & md.mask.ice_levelset<0);
+vel(pos1) = griddata(md.mesh.x(pos2),md.mesh.y(pos2),vel(pos2),md.mesh.x(pos1),md.mesh.y(pos1),'nearest');
+% -- NOTE --
 disp('      -- Deduce friction coefficient');
 md.friction.coefficient=sqrt(md.materials.rho_ice*md.geometry.thickness.*(sslope)./(Neff.*vel/md.constants.yts));
 md.friction.coefficient=min(md.friction.coefficient,200);
 md.friction.p = 1.0 * ones(md.mesh.numberofelements,1);
 md.friction.q = 1.0 * ones(md.mesh.numberofelements,1);
 disp('      -- Extrapolate on ice free and floating ice regions');
-flags=(md.mask.ice_levelset>0) | (md.mask.groundedice_levelset<0); pos1=find(flags); pos2=find(~flags);
+flags=(md.mask.ice_levelset>0) | (md.mask.ocean_levelset<0); pos1=find(flags); pos2=find(~flags);
 %md.friction.coefficient(pos1) = griddata(md.mesh.x(pos2),md.mesh.y(pos2),md.friction.coefficient(pos2),md.mesh.x(pos1),md.mesh.y(pos1),'natural');
 md.friction.coefficient(pos1) = 1;
 pos=find(isnan(md.friction.coefficient));
@@ -490,13 +527,15 @@ end
 %%{{{ Geothermal heat flux
 fprintf(['\n\033[33m   Geothermal heat flux \033[0m \n\n']);
 disp('   Geothermal flux from Shapiro et al.');
-md.basalforcings.geothermalflux=interpSeaRISE(md.mesh.x,md.mesh.y,'bheatflx');
+%md.basalforcings.geothermalflux=interpSeaRISE(md.mesh.x,md.mesh.y,'bheatflx');
+md.basalforcings.geothermalflux=nan*ones(md.mesh.numberofvertices);
 %%}}}
 disp ' '
 
 %%{{{ Thermal model
 fprintf(['\n\033[33m   Thermal model \033[0m \n\n']);
-md.initialization.temperature=min(0,interpSeaRISE(md.mesh.x,md.mesh.y,'surftemp'))+273.15;
+%md.initialization.temperature=min(0,interpSeaRISE(md.mesh.x,md.mesh.y,'surftemp'))+273.15;
+md.initialization.temperature=nan*ones(md.mesh.numberofvertices);
 md.initialization.waterfraction=zeros(md.mesh.numberofvertices,1);
 md.initialization.watercolumn=zeros(md.mesh.numberofvertices,1);
 md.thermal.spctemperature=md.initialization.temperature;

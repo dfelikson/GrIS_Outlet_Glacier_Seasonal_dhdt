@@ -5,14 +5,18 @@
 % [ ] 4. there is ice in the BedMachine mask that lies beyond the Front0 exp file -- remove it somehow
 % [ ] 5. need separate MinExtent exps ... one for yearly termini ... one for monthly
 
-steps = [12];
+steps = [3];
 clusterName = ''; % empty for localhost
-clusterName = 'oibserve';
+%clusterName = 'oibserve';
 %clusterName = 'discover';
 
 %% Setup
 region = 'SAtoES';
-experiment = 'NyearlyTest';
+experiment = 'friction_coefficient';
+%experiment = 'friction_coefficient_MEaSUREsVel';
+%experiment = 'friction_coefficient_ITS_LIVEVel2007';
+%experiment = 'friction_coefficient_MEaSUREsVel2007';
+experiment = 'friction_coefficient_ITS_LIVEVel';
 switch region
    case 'WestGrIS' %%{{{
       start_year = 1985;
@@ -39,7 +43,7 @@ switch region
    case 'SAtoES' %%{{{
       start_year = 1985;
       end_year   = 2100;
-      relaxation_years = 1;
+      relaxation_years = 10;
       termini_dir = '/Users/dfelikso/Research/Data/GlacierTermini/West_Greenland';
       end_year_termini = 2015;
       clear glaciers
@@ -47,6 +51,28 @@ switch region
       glaciers{ 2} = 'SK';
       glaciers{ 3} = 'Kan';
       glaciers{ 4} = 'Equip';
+      
+		surface_select = 'GIMP';
+      %velocity_select = 'MEaSUREs';
+      %velocity_select = 'MEaSUREs2007';
+      %velocity_select = 'ITS_LIVE2007';
+      velocity_select = 'ITS_LIVE';
+      %velocity_select_years = [1991 1992 1993 1995];
+      %velocity_select_years = 1997;
+      velocity_scalefactor_MEaSUREs = 1.00;
+
+      %extend_ice_mask_to_earliest_terminus = true;
+
+      fill_nunataks = false;
+
+      %% SMB
+      %smb_source = 'RACMO';
+      %smb_type = 'yearly';
+      %smb_datayears = start_year:end_year;
+
+      % Viscocity
+      ice_temp = -5; % deg C
+   %%}}}
 %%}}}
 end
 
@@ -311,6 +337,8 @@ if perform(org,'Mesh'),% {{{ STEP 2
    [velx, vely] = interpJoughinCompositeGreenland(md.mesh.x,md.mesh.y);
    vel  = sqrt(velx.^2+vely.^2);
 
+   save('Cheat_matfiles/vel.mat','velx','vely','vel');
+
    %Adapt mesh
 	disp('Optimizing mesh');
 
@@ -340,7 +368,10 @@ if perform(org,'Mesh'),% {{{ STEP 2
       end
    end
    
+   %save('Cheat_matfiles/hmaxVertices.mat','hmaxVertices');
+
    md = bamg(md,'hmin',hmin,'hmax',hmax,'field',vel,'err',2,'hmaxVertices',hmaxVertices);
+   %return
    %md = bamg(md,'hmin',hmin,'hmax',hmax,'field',vel,'err',2);
    
    [md.mesh.lat,md.mesh.long]  = xy2ll(md.mesh.x,md.mesh.y,+1,45,70);
@@ -364,6 +395,39 @@ if perform(org,'Param'),% {{{ STEP 3
       pos = find(ContourToNodes(md.mesh.x,md.mesh.y,filename,1));
       md.materials.rheology_B(pos) = 0.60 .* md.materials.rheology_B(pos);
    end
+
+   % geometry_bed = md.geometry.bed;
+   % geometry_surface = md.geometry.surface;
+   % geometry_thickness = md.geometry.thickness;
+   % geometry_base = md.geometry.base;
+   % mask_ice_levelset = md.mask.ice_levelset;
+   % mask_groundedice_levelset = md.mask.groundedice_levelset;
+   % inversion_vx_obs = md.inversion.vx_obs;
+   % inversion_vy_obs = md.inversion.vy_obs;
+   % inversion_vel_obs = md.inversion.vel_obs;
+   % initialization_vx = md.initialization.vx;
+   % initialization_vy = md.initialization.vy;
+   % initialization_vz = md.initialization.vz;
+   % initialization_vel = md.initialization.vel;
+   % friction_coefficient = md.friction.coefficient;
+   % rheology_n = md.materials.rheology_n;
+   % rheology_B = md.materials.rheology_B;
+   % basalforcings_groundedice_melting_rate = md.basalforcings.groundedice_melting_rate;
+   % basalforcings_floatingice_melting_rate = md.basalforcings.floatingice_melting_rate;
+   % smb_mass_balance = md.smb.mass_balance;
+   % basalforcings_geothermalflux = md.basalforcings.geothermalflux;
+   % stressbalance_spcvx = md.stressbalance.spcvx;
+   % stressbalance_spcvy = md.stressbalance.spcvy;
+   % stressbalance_spcvz = md.stressbalance.spcvz;
+   % stressbalance_referential = md.stressbalance.referential;
+   % stressbalance_loadingforce = md.stressbalance.loadingforce;
+   % masstransport_spcthickness = md.masstransport.spcthickness;
+   % save('Cheat_matfiles/param.mat','geometry_bed','geometry_surface','geometry_base','geometry_thickness',...
+   %                  'mask_ice_levelset','mask_groundedice_levelset','inversion_vx_obs','inversion_vy_obs','inversion_vel_obs',...
+   %                  'initialization_vx','initialization_vy','initialization_vz','initialization_vel','friction_coefficient',...
+   %                  'rheology_n','rheology_B','basalforcings_groundedice_melting_rate','basalforcings_floatingice_melting_rate',...
+   %                  'smb_mass_balance','basalforcings_geothermalflux','stressbalance_spcvx','stressbalance_spcvy','stressbalance_spcvz',...
+   %                  'stressbalance_referential','stressbalance_loadingforce','masstransport_spcthickness');
 
 	savemodel(org,md);
 end %}}}
@@ -406,11 +470,12 @@ if perform(org,'Inversion'),% {{{ STEP 4
 	%Controls
 	md.inversion.control_parameters={'FrictionCoefficient'};
 	md.inversion.maxsteps=50;
-	md.inversion.maxiter =50;
+	md.inversion.maxiter =100;
 	md.inversion.min_parameters=0.05*ones(md.mesh.numberofvertices,1);
 	md.inversion.max_parameters=200*ones(md.mesh.numberofvertices,1);
 	md.inversion.control_scaling_factors=1;
 
+   if false
    %Set basal friction coefficient initial guess to something low at front
    filename = ['Exp/' region '_coeffront.exp'];
    %if ~exist(filename,'file'),
@@ -422,7 +487,8 @@ if perform(org,'Inversion'),% {{{ STEP 4
       flags = ContourToNodes(md.mesh.x,md.mesh.y,filename,2);
       %flags = md.inversion.vel_obs == 0;
       pos1 = find(flags); pos2 = find(~flags);
-      md.friction.coefficient(pos1,:)  = 10;
+      %md.friction.coefficient(pos1,:)  = 10;
+      md.friction.coefficient(pos1,:)  = 20;
       %md.friction.coefficient(pos1,:)  = 40;
       %md.friction.coefficient(pos1,:)  = 50;
       %md.friction.coefficient(pos1,:)  = 100;
@@ -437,6 +503,7 @@ if perform(org,'Inversion'),% {{{ STEP 4
       %    md.inversion.cost_functions_coefficients(pos1,1) = 0;
       %    md.inversion.cost_functions_coefficients(pos1,2) = 0;
       % end
+   end
    end
 
    % %Fix friction coefficient
@@ -461,7 +528,21 @@ if perform(org,'Inversion'),% {{{ STEP 4
 	md.verbose.solution=1;
 	md.cluster = cluster;
    md.settings.waitonlock = waitonlock;
+
+   %md.verbose.mprocessor = true;
+   %md.verbose.module     = true;
+   md.verbose.solution   = false;
+   %md.verbose.solver     = true;
+   %md.verbose.convergence= true;
+   %md.verbose.control    = true;
+   %md.verbose.qmu        = true;
+   %md.verbose.autodiff   = true;
+   %md.verbose.smb        = true;
+
+   md.friction.coupling = 2;
+
    md = solve(md,'Stressbalance');
+   return
 
    % Save
    savemodel(org,md);
@@ -469,7 +550,14 @@ end%}}}
 if perform(org,['Relaxation' num2str(relaxation_years) 'yr']),% {{{ STEP 5
 
 	md=loadmodel(org,'Inversion');
+	%md=loadmodel('./Models/SAtoES_Inversion');
    
+	% TODO
+	idx = (md.geometry.base - md.geometry.bed > 1e-5);
+	idx(md.mask.ice_levelset>0) = 0;
+	md.geometry.base(find(idx)) = md.geometry.bed(find(idx));
+	md.geometry.thickness = md.geometry.surface - md.geometry.base;
+
    %Put results of inversion back into the model for forward runs
    md.friction.coefficient=md.results.StressbalanceSolution.FrictionCoefficient;
 
@@ -512,7 +600,7 @@ if perform(org,['Relaxation' num2str(relaxation_years) 'yr']),% {{{ STEP 5
 	% We set the calving model (no moving front ... spclevelset is actually ignored)
 	md.levelset.spclevelset = md.levelset.spclevelset;
 	md.calving.calvingrate = zeros(md.mesh.numberofvertices,1);
-	md.calving.meltingrate = zeros(md.mesh.numberofvertices,1);
+	%md.calving.meltingrate = zeros(md.mesh.numberofvertices,1);
 
 	% Set the requested outputs
    md.stressbalance.requested_outputs={'default'};
