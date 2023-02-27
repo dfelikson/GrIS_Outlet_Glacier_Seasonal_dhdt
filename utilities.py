@@ -7,7 +7,7 @@ import numpy
 from bilinear_interpolate import *
 
 def interp1985DEM(x,y): #,method='bilinear'):
-    dem_filename = './Cheat_matfiles/aerodem_1985_utm22_1_epsg3413.lzw.tif'
+    dem_filename = '/efs/GrIS_Outlet_Glacier_Seasonal_dhdt/aerodem_1985_utm22_1_epsg3413.lzw.tif'
     
     raster = gdal.Open(dem_filename, gdalconst.GA_ReadOnly)
     rasterBand = raster.GetRasterBand(1)
