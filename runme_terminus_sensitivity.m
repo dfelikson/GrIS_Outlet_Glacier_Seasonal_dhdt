@@ -7,16 +7,16 @@
 
 steps = [3];
 clusterName = ''; % empty for localhost
-%clusterName = 'oibserve';
+clusterName = 'oibserve';
 %clusterName = 'discover';
 
 %% Setup
 region = 'SAtoES';
 experiment = 'friction_coefficient';
-%experiment = 'friction_coefficient_MEaSUREsVel';
+experiment = 'friction_coefficient_MEaSUREsVel';
 %experiment = 'friction_coefficient_ITS_LIVEVel2007';
 %experiment = 'friction_coefficient_MEaSUREsVel2007';
-experiment = 'friction_coefficient_ITS_LIVEVel';
+%experiment = 'friction_coefficient_ITS_LIVEVel';
 switch region
    case 'WestGrIS' %%{{{
       start_year = 1985;
@@ -53,10 +53,10 @@ switch region
       glaciers{ 4} = 'Equip';
       
 		surface_select = 'GIMP';
-      %velocity_select = 'MEaSUREs';
+      velocity_select = 'MEaSUREs';
       %velocity_select = 'MEaSUREs2007';
       %velocity_select = 'ITS_LIVE2007';
-      velocity_select = 'ITS_LIVE';
+      %velocity_select = 'ITS_LIVE';
       %velocity_select_years = [1991 1992 1993 1995];
       %velocity_select_years = 1997;
       velocity_scalefactor_MEaSUREs = 1.00;
@@ -85,7 +85,7 @@ switch clusterName %%{{{
       waitonlock = 10;
 
    case 'oibserve'
-      cluster = generic('name', 'gs615-oibserve.ndc.nasa.gov', 'np', 8, ...
+      cluster = generic('name', 'gs615-oibserve.ndc.nasa.gov', 'np', 16, ...
          'login', 'dfelikso', ...
          'codepath', '/home/dfelikso/Software/ISSM/trunk-jpl/bin', ...
          'etcpath', '/home/dfelikso/Software/ISSM/trunk-jpl/etc', ...
@@ -430,6 +430,9 @@ if perform(org,'Param'),% {{{ STEP 3
    %                  'stressbalance_referential','stressbalance_loadingforce','masstransport_spcthickness');
 
 	savemodel(org,md);
+
+   % Also save a netCDF to transfer work over to the JupyterHub (Python)
+   export_netCDF(md, ['./Models/' region '_' experiment '/SAtoES_Param.nc']);
 end %}}}
 if perform(org,'Inversion'),% {{{ STEP 4
 
@@ -542,11 +545,48 @@ if perform(org,'Inversion'),% {{{ STEP 4
    md.friction.coupling = 2;
 
    md = solve(md,'Stressbalance');
-   return
 
    % Save
    savemodel(org,md);
 end%}}}
+
+if perform(org,'Extrapolate_friction'),% {{{ STEP 5
+	md=loadmodel(org,'Inversion');
+
+   glaciers{1} = 'SermeqAvangnardleq';
+   glaciers{2} = 'SermeqKujatdleq';
+   glaciers{3} = 'KangilerngataSermia';
+   glaciers{4} = 'EqipSermia';
+
+   ice_levelset = md.mask.ice_levelset;
+   ocean_levelset = md.mask.ocean_levelset;
+   friction_coefficient = md.results.StressbalanceSolution.FrictionCoefficient;
+
+   for iglacier = 1:numel(glaciers)
+      glacier = glaciers{iglacier};
+      exp1985 = ['../issm_github/exp/' glacier '_TerminusYearly_1985.exp'];
+
+      pos_valid = find( md.mask.ice_levelset<0 );
+      pos_invalid = find( ContourToNodes(md.mesh.x,md.mesh.y,exp1985,2) & md.mask.ice_levelset>0 );
+
+      friction_coefficient(pos_invalid) = griddata(md.mesh.x(pos_valid), md.mesh.y(pos_valid), friction_coefficient(pos_valid), md.mesh.x(pos_invalid), md.mesh.y(pos_invalid),'nearest');
+      ice_levelset(pos_invalid) = -1;
+      ocean_levelset(pos_invalid) = +1;
+   end
+   
+   ice_levelset = reinitializelevelset(md, ice_levelset);
+   ocean_levelset = reinitializelevelset(md, ocean_levelset);
+
+   md.mask.ice_levelset = ice_levelset;
+   md.mask.ocean_levelset = ocean_levelset;
+   md.friction.coefficient = friction_coefficient;
+
+   % Save
+   savemodel(org,md);
+end % }}}
+
+
+return
 if perform(org,['Relaxation' num2str(relaxation_years) 'yr']),% {{{ STEP 5
 
 	md=loadmodel(org,'Inversion');

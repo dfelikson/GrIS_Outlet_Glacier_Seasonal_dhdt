@@ -528,14 +528,14 @@ end
 fprintf(['\n\033[33m   Geothermal heat flux \033[0m \n\n']);
 disp('   Geothermal flux from Shapiro et al.');
 %md.basalforcings.geothermalflux=interpSeaRISE(md.mesh.x,md.mesh.y,'bheatflx');
-md.basalforcings.geothermalflux=nan*ones(md.mesh.numberofvertices);
+md.basalforcings.geothermalflux = nan;
 %%}}}
 disp ' '
 
 %%{{{ Thermal model
 fprintf(['\n\033[33m   Thermal model \033[0m \n\n']);
 %md.initialization.temperature=min(0,interpSeaRISE(md.mesh.x,md.mesh.y,'surftemp'))+273.15;
-md.initialization.temperature=nan*ones(md.mesh.numberofvertices);
+md.initialization.temperature=nan;
 md.initialization.waterfraction=zeros(md.mesh.numberofvertices,1);
 md.initialization.watercolumn=zeros(md.mesh.numberofvertices,1);
 md.thermal.spctemperature=md.initialization.temperature;
