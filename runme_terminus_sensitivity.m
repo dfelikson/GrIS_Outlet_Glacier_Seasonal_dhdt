@@ -7,7 +7,7 @@
 
 steps = [3];
 clusterName = ''; % empty for localhost
-clusterName = 'oibserve';
+%clusterName = 'oibserve';
 %clusterName = 'discover';
 
 %% Setup
@@ -380,11 +380,14 @@ if perform(org,'Mesh'),% {{{ STEP 2
 	savemodel(org,md);
 
 end %}}}
-if perform(org,'Param'),% {{{ STEP 3
+m = 20.0;
+if perform(org,sprintf('Param_m%3.1f',m)),% {{{ STEP 3
 
 	md=loadmodel(org,'Mesh');
 
    % Parameterize
+   md.friction.p = 1/m * ones(md.mesh.numberofelements,1);
+   md.friction.q = md.friction.p;
 	md=parameterize(md,'Par/Greenland.par');
    md=setflowequation(md,'SSA','all');
 
@@ -432,7 +435,7 @@ if perform(org,'Param'),% {{{ STEP 3
 	savemodel(org,md);
 
    % Also save a netCDF to transfer work over to the JupyterHub (Python)
-   export_netCDF(md, ['./Models/' region '_' experiment '/SAtoES_Param.nc']);
+   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Param_m%3.1f.nc',m)]);
 end %}}}
 if perform(org,'Inversion'),% {{{ STEP 4
 

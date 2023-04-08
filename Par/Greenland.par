@@ -411,42 +411,7 @@ disp ' '
 % md.mask.groundedice_levelset(pos)=-1;
 
 %%{{{ Basal friction
-fprintf(['\n\033[33m   Basal friction \033[0m \n\n']);
-disp('   Initialize basal friction using driving stress');
-disp('      -- Compute surface slopes and use 10 L2 projections');
-[sx,sy,s]=slope(md); sslope=averaging(md,s,10);
-disp('      -- Process surface velocity data');
-vel = md.inversion.vel_obs;
-flags=(vel==0); pos1=find(flags); pos2=find(~flags);
-vel(pos1) = griddata(md.mesh.x(pos2),md.mesh.y(pos2),vel(pos2),md.mesh.x(pos1),md.mesh.y(pos1));
-%velmax = max(vel);
-%vel(vel==0 & md.mask.ice_levelset<0) = velmax;
-disp('      -- Filling in missing ice velocity with MEaSUREs mosaic');
-[velx, vely] = interpJoughinCompositeGreenland(md.mesh.x,md.mesh.y);
-vel = sqrt( velx.^2 + vely.^2 );
-idx = md.mask.ice_levelset < 0 & isnan(vel);
-vel(idx) = sqrt( velx(idx).^2 + vely(idx).^2 );
-vel=max(vel,0.1);
-disp('      -- Calculate effective pressure');
-Neff = md.materials.rho_ice*md.geometry.thickness+md.materials.rho_water*md.geometry.base;
-Neff(find(Neff<=0))=1;
-% -- NOTE --
-Neff=max(Neff,5e4);
-pos1 = find(Neff==5e4 & vel <100 & md.mask.ice_levelset<0);
-pos2 = find(Neff >5e4 & vel>=100 & md.mask.ice_levelset<0);
-vel(pos1) = griddata(md.mesh.x(pos2),md.mesh.y(pos2),vel(pos2),md.mesh.x(pos1),md.mesh.y(pos1),'nearest');
-% -- NOTE --
-disp('      -- Deduce friction coefficient');
-md.friction.coefficient=sqrt(md.materials.rho_ice*md.geometry.thickness.*(sslope)./(Neff.*vel/md.constants.yts));
-md.friction.coefficient=min(md.friction.coefficient,200);
-md.friction.p = 1.0 * ones(md.mesh.numberofelements,1);
-md.friction.q = 1.0 * ones(md.mesh.numberofelements,1);
-disp('      -- Extrapolate on ice free and floating ice regions');
-flags=(md.mask.ice_levelset>0) | (md.mask.ocean_levelset<0); pos1=find(flags); pos2=find(~flags);
-%md.friction.coefficient(pos1) = griddata(md.mesh.x(pos2),md.mesh.y(pos2),md.friction.coefficient(pos2),md.mesh.x(pos1),md.mesh.y(pos1),'natural');
-md.friction.coefficient(pos1) = 1;
-pos=find(isnan(md.friction.coefficient));
-md.friction.coefficient(pos)  = 1;
+md.friction.coefficient = basal_friction_initial_guess(md);
 %%}}}
 disp ' '
 
