@@ -7,7 +7,7 @@
 
 steps = [3];
 clusterName = ''; % empty for localhost
-clusterName = 'oibserve';
+%clusterName = 'oibserve';
 %clusterName = 'discover';
 
 %% Setup
@@ -337,7 +337,7 @@ if perform(org,'Mesh'),% {{{ STEP 2
    [velx, vely] = interpJoughinCompositeGreenland(md.mesh.x,md.mesh.y);
    vel  = sqrt(velx.^2+vely.^2);
 
-   save('Cheat_matfiles/vel.mat','velx','vely','vel');
+   %save('Cheat_matfiles/vel.mat','velx','vely','vel');
 
    %Adapt mesh
 	disp('Optimizing mesh');
@@ -370,7 +370,7 @@ if perform(org,'Mesh'),% {{{ STEP 2
    
    %save('Cheat_matfiles/hmaxVertices.mat','hmaxVertices');
 
-   md = bamg(md,'hmin',hmin,'hmax',hmax,'field',vel,'err',2,'hmaxVertices',hmaxVertices);
+   md = bamg(md,'hmin',hmin,'hmax',hmax,'field',vel,'err',2); %,'hmaxVertices',hmaxVertices);
    %return
    %md = bamg(md,'hmin',hmin,'hmax',hmax,'field',vel,'err',2);
    
@@ -380,14 +380,16 @@ if perform(org,'Mesh'),% {{{ STEP 2
 	savemodel(org,md);
 
 end %}}}
-if perform(org,'Param'),% {{{ STEP 3
+if perform(org,sprintf('Param_m1.0',m)),% {{{ STEP 3
 
-	md=loadmodel(org,'Mesh');
+	md = loadmodel(org,'Mesh');
 
    % Parameterize
+   md.friction.p = ones(md.mesh.numberofelements,1);
+   md.friction.q = md.friction.p;
 	md=parameterize(md,'Par/Greenland.par');
    md=setflowequation(md,'SSA','all');
-
+   
    % Weaken shear margins
    filename = ['Exp/' region '_shearmargins.exp'];
    if exist(filename, 'file')
@@ -396,43 +398,55 @@ if perform(org,'Param'),% {{{ STEP 3
       md.materials.rheology_B(pos) = 0.60 .* md.materials.rheology_B(pos);
    end
 
-   % geometry_bed = md.geometry.bed;
-   % geometry_surface = md.geometry.surface;
-   % geometry_thickness = md.geometry.thickness;
-   % geometry_base = md.geometry.base;
-   % mask_ice_levelset = md.mask.ice_levelset;
-   % mask_groundedice_levelset = md.mask.groundedice_levelset;
-   % inversion_vx_obs = md.inversion.vx_obs;
-   % inversion_vy_obs = md.inversion.vy_obs;
-   % inversion_vel_obs = md.inversion.vel_obs;
-   % initialization_vx = md.initialization.vx;
-   % initialization_vy = md.initialization.vy;
-   % initialization_vz = md.initialization.vz;
-   % initialization_vel = md.initialization.vel;
-   % friction_coefficient = md.friction.coefficient;
-   % rheology_n = md.materials.rheology_n;
-   % rheology_B = md.materials.rheology_B;
-   % basalforcings_groundedice_melting_rate = md.basalforcings.groundedice_melting_rate;
-   % basalforcings_floatingice_melting_rate = md.basalforcings.floatingice_melting_rate;
-   % smb_mass_balance = md.smb.mass_balance;
-   % basalforcings_geothermalflux = md.basalforcings.geothermalflux;
-   % stressbalance_spcvx = md.stressbalance.spcvx;
-   % stressbalance_spcvy = md.stressbalance.spcvy;
-   % stressbalance_spcvz = md.stressbalance.spcvz;
-   % stressbalance_referential = md.stressbalance.referential;
-   % stressbalance_loadingforce = md.stressbalance.loadingforce;
-   % masstransport_spcthickness = md.masstransport.spcthickness;
-   % save('Cheat_matfiles/param.mat','geometry_bed','geometry_surface','geometry_base','geometry_thickness',...
-   %                  'mask_ice_levelset','mask_groundedice_levelset','inversion_vx_obs','inversion_vy_obs','inversion_vel_obs',...
-   %                  'initialization_vx','initialization_vy','initialization_vz','initialization_vel','friction_coefficient',...
-   %                  'rheology_n','rheology_B','basalforcings_groundedice_melting_rate','basalforcings_floatingice_melting_rate',...
-   %                  'smb_mass_balance','basalforcings_geothermalflux','stressbalance_spcvx','stressbalance_spcvy','stressbalance_spcvz',...
-   %                  'stressbalance_referential','stressbalance_loadingforce','masstransport_spcthickness');
+	savemodel(org,md);
+
+   % Also save a netCDF to transfer work over to the JupyterHub (Python)
+   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Param_m1.0.nc',m)]);
+end %}}}
+m = 0.5;
+if perform(org,sprintf('Param_m%3.1f',m)),% {{{ STEP 4
+
+	md = loadmodel(org,'Param_m1.0');
+
+   N = effectivepressure(md);
+   vb = basal_vel_from_surface_vel_obs(md);
+
+   md.friction.coupling = 2;
+   md = solve_sb(md);
+   md.initialization.vx  = md.results.StressbalanceSolution.Vx;
+   md.initialization.vy  = md.results.StressbalanceSolution.Vy;
+   md.initialization.vel = md.results.StressbalanceSolution.Vel;
+   
+   ub1 = md.results.StressbalanceSolution.Vel;
+   s = averaging(md,1./md.friction.p,0);
+   r = averaging(md,md.friction.q./md.friction.p,0);
+   b1 = N.^r .* (md.friction.coefficient).^2 .* ub1.^s;%  b( ub==0 & (s-1)<0) = 0;
+
+   % Convert
+   md2 = friction_coefficient_conversion(md, 'budd', 'budd', 'p', 1/m, 'q', 1/m);
+
+   md2.friction.coupling = 2;
+   md2 = solve_sb(md2);
+   md.initialization.vx  = md.results.StressbalanceSolution.Vx;
+   md.initialization.vy  = md.results.StressbalanceSolution.Vy;
+   md.initialization.vel = md.results.StressbalanceSolution.Vel;
+   
+   ub2 = md.results.StressbalanceSolution.Vel;
+   s = averaging(md,1./md.friction.p,0);
+   r = averaging(md,md.friction.q./md.friction.p,0);
+   b2 = N.^r .* (md.friction.coefficient).^2 .* ub2.^s;%  b( ub==0 & (s-1)<0) = 0;
+
+   ub_diff_rel = (ub2-ub1) ./ ub1;
+   fprintf('\n');
+   fprintf('Mean absolute relative difference in velocity = %10.8f m/yr\n', mean(abs(ub_diff_rel), 'omitnan'));
+   fprintf('\n');
+
+   return
 
 	savemodel(org,md);
 
    % Also save a netCDF to transfer work over to the JupyterHub (Python)
-   export_netCDF(md, ['./Models/' region '_' experiment '/SAtoES_Param.nc']);
+   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Param_m%3.1f.nc',m)]);
 end %}}}
 if perform(org,'Inversion'),% {{{ STEP 4
 
