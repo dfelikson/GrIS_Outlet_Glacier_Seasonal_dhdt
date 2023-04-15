@@ -504,8 +504,8 @@ md.initialization.temperature=nan;
 md.initialization.waterfraction=zeros(md.mesh.numberofvertices,1);
 md.initialization.watercolumn=zeros(md.mesh.numberofvertices,1);
 md.thermal.spctemperature=md.initialization.temperature;
-md.thermal.isenthalpy=1;
-md.thermal.isdynamicbasalspc=1;
+md.thermal.isenthalpy=0;
+md.thermal.isdynamicbasalspc=0;
 %%}}}
 disp ' '
 

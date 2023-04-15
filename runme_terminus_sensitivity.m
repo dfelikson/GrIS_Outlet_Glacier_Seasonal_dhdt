@@ -5,7 +5,7 @@
 % [ ] 4. there is ice in the BedMachine mask that lies beyond the Front0 exp file -- remove it somehow
 % [ ] 5. need separate MinExtent exps ... one for yearly termini ... one for monthly
 
-steps = [3];
+steps = [5];
 clusterName = ''; % empty for localhost
 %clusterName = 'oibserve';
 %clusterName = 'discover';
@@ -380,13 +380,12 @@ if perform(org,'Mesh'),% {{{ STEP 2
 	savemodel(org,md);
 
 end %}}}
-m = 20.0;
-if perform(org,sprintf('Param_m%3.1f',m)),% {{{ STEP 3
+if perform(org,'Param_m1.0'),% {{{ STEP 3
 
 	md=loadmodel(org,'Mesh');
 
    % Parameterize
-   md.friction.p = 1/m * ones(md.mesh.numberofelements,1);
+   md.friction.p = ones(md.mesh.numberofelements,1);
    md.friction.q = md.friction.p;
 	md=parameterize(md,'Par/Greenland.par');
    md=setflowequation(md,'SSA','all');
@@ -399,47 +398,14 @@ if perform(org,sprintf('Param_m%3.1f',m)),% {{{ STEP 3
       md.materials.rheology_B(pos) = 0.60 .* md.materials.rheology_B(pos);
    end
 
-   % geometry_bed = md.geometry.bed;
-   % geometry_surface = md.geometry.surface;
-   % geometry_thickness = md.geometry.thickness;
-   % geometry_base = md.geometry.base;
-   % mask_ice_levelset = md.mask.ice_levelset;
-   % mask_groundedice_levelset = md.mask.groundedice_levelset;
-   % inversion_vx_obs = md.inversion.vx_obs;
-   % inversion_vy_obs = md.inversion.vy_obs;
-   % inversion_vel_obs = md.inversion.vel_obs;
-   % initialization_vx = md.initialization.vx;
-   % initialization_vy = md.initialization.vy;
-   % initialization_vz = md.initialization.vz;
-   % initialization_vel = md.initialization.vel;
-   % friction_coefficient = md.friction.coefficient;
-   % rheology_n = md.materials.rheology_n;
-   % rheology_B = md.materials.rheology_B;
-   % basalforcings_groundedice_melting_rate = md.basalforcings.groundedice_melting_rate;
-   % basalforcings_floatingice_melting_rate = md.basalforcings.floatingice_melting_rate;
-   % smb_mass_balance = md.smb.mass_balance;
-   % basalforcings_geothermalflux = md.basalforcings.geothermalflux;
-   % stressbalance_spcvx = md.stressbalance.spcvx;
-   % stressbalance_spcvy = md.stressbalance.spcvy;
-   % stressbalance_spcvz = md.stressbalance.spcvz;
-   % stressbalance_referential = md.stressbalance.referential;
-   % stressbalance_loadingforce = md.stressbalance.loadingforce;
-   % masstransport_spcthickness = md.masstransport.spcthickness;
-   % save('Cheat_matfiles/param.mat','geometry_bed','geometry_surface','geometry_base','geometry_thickness',...
-   %                  'mask_ice_levelset','mask_groundedice_levelset','inversion_vx_obs','inversion_vy_obs','inversion_vel_obs',...
-   %                  'initialization_vx','initialization_vy','initialization_vz','initialization_vel','friction_coefficient',...
-   %                  'rheology_n','rheology_B','basalforcings_groundedice_melting_rate','basalforcings_floatingice_melting_rate',...
-   %                  'smb_mass_balance','basalforcings_geothermalflux','stressbalance_spcvx','stressbalance_spcvy','stressbalance_spcvz',...
-   %                  'stressbalance_referential','stressbalance_loadingforce','masstransport_spcthickness');
-
 	savemodel(org,md);
 
    % Also save a netCDF to transfer work over to the JupyterHub (Python)
-   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Param_m%3.1f.nc',m)]);
+   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Param_m1.0.nc',m)]);
 end %}}}
-if perform(org,'Inversion'),% {{{ STEP 4
+if perform(org,'Inversion_m1.0'),% {{{ STEP 4
 
-	md=loadmodel(org,'Param');
+	md=loadmodel(org,'Param_m1.0');
 
 	%Control general
 	md.inversion=m1qn3inversion(md.inversion);
@@ -551,9 +517,51 @@ if perform(org,'Inversion'),% {{{ STEP 4
 
    % Save
    savemodel(org,md);
-end%}}}
 
-if perform(org,'Extrapolate_friction'),% {{{ STEP 5
+   % Also save a netCDF to transfer work over to the JupyterHub (Python)
+   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Inversion_m1.0.nc',m)]);
+end%}}}
+m = 0.1;
+if perform(org,sprintf('Friction_m%3.1f',m)),% {{{ STEP 5
+
+	md = loadmodel(org,'Inversion_m1.0');
+   md.friction.coefficient = md.results.StressbalanceSolution.FrictionCoefficient;
+   md.initialization.vx = md.results.StressbalanceSolution.Vx;
+   md.initialization.vy = md.results.StressbalanceSolution.Vy;
+   md.initialization.vel = md.results.StressbalanceSolution.Vel;
+
+   N = effectivepressure(md);
+   vb = md.results.StressbalanceSolution.Vel;
+   taub1 = md.friction.coefficient.^2 .* N .* (vb/md.constants.yts);
+
+   ub1 = md.results.StressbalanceSolution.Vel;
+
+   % Convert
+   md = md;
+
+   md.friction.p(:) = 1/m;
+   md.friction.q(:) = 1/m;
+   md.friction.coefficient = sqrt(taub1./max(1, N .* (md.results.StressbalanceSolution.Vel/md.constants.yts).^m));
+
+   taub2 = md.friction.coefficient.^2 .* N .* (vb/md.constants.yts).^m;
+   md.inversion.iscontrol = 0;
+   md = solve_sb(md);
+
+   ub2 = md.results.StressbalanceSolution.Vel;
+
+   ub_diff_rel = 100 * (ub2-ub1) ./ ub1;
+   fprintf('\n');
+   fprintf('Mean absolute relative difference in velocity = %8.5f%%\n', mean(abs(ub_diff_rel), 'omitnan'));
+   fprintf('\n');
+
+	savemodel(org,md);
+
+   % Also save a netCDF to transfer work over to the JupyterHub (Python)
+   export_netCDF(md, ['./Models/' region '_' experiment sprintf('/SAtoES_Friction_m%3.1f.nc',m)]);
+end %}}}
+
+return
+if perform(org,'Extrapolate_friction'),% {{{ STEP 6
 	md=loadmodel(org,'Inversion');
 
    glaciers{1} = 'SermeqAvangnardleq';
@@ -588,9 +596,7 @@ if perform(org,'Extrapolate_friction'),% {{{ STEP 5
    savemodel(org,md);
 end % }}}
 
-
-return
-if perform(org,['Relaxation' num2str(relaxation_years) 'yr']),% {{{ STEP 5
+if perform(org,['Relaxation' num2str(relaxation_years) 'yr']),% {{{ STEP X
 
 	md=loadmodel(org,'Inversion');
 	%md=loadmodel('./Models/SAtoES_Inversion');
@@ -659,7 +665,7 @@ if perform(org,['Relaxation' num2str(relaxation_years) 'yr']),% {{{ STEP 5
    savemodel(org,md);
 end%}}}
 
-if perform(org,'Control'),% {{{ STEP 6
+if perform(org,'Control'),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -699,7 +705,7 @@ if perform(org,'Control'),% {{{ STEP 6
 	savemodel(org,md);
 
 end %}}}
-if perform(org,'TerminusYearly'),% {{{ STEP 7
+if perform(org,'TerminusYearly'),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -849,7 +855,7 @@ if perform(org,'TerminusYearly'),% {{{ STEP 7
 	savemodel(org,md);
 
 end %}}}
-if perform(org,['Terminus' num2str(start_year) '-' num2str(end_year_termini)]),% {{{ STEP 8
+if perform(org,['Terminus' num2str(start_year) '-' num2str(end_year_termini)]),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -960,7 +966,7 @@ if perform(org,['Terminus' num2str(start_year) '-' num2str(end_year_termini)]),%
 	savemodel(org,md);
 
 end %}}}
-if perform(org,['TerminusMonthly']),% {{{ STEP 9
+if perform(org,['TerminusMonthly']),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -1104,7 +1110,7 @@ if perform(org,['TerminusMonthly']),% {{{ STEP 9
 
 end %}}}
 
-if perform(org,'Terminus3yearly'),% {{{ STEP 10
+if perform(org,'Terminus3yearly'),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -1254,7 +1260,7 @@ if perform(org,'Terminus3yearly'),% {{{ STEP 10
 	savemodel(org,md);
 
 end %}}}
-if perform(org,'Terminus5yearly'),% {{{ STEP 11
+if perform(org,'Terminus5yearly'),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -1404,7 +1410,7 @@ if perform(org,'Terminus5yearly'),% {{{ STEP 11
 	savemodel(org,md);
 
 end %}}}
-if perform(org,'Terminus10yearly'),% {{{ STEP 12
+if perform(org,'Terminus10yearly'),% {{{ STEP X
 
    md=loadmodel(org,['Relaxation' num2str(relaxation_years) 'yr']);
 
@@ -1554,7 +1560,7 @@ if perform(org,'Terminus10yearly'),% {{{ STEP 12
 	savemodel(org,md);
 
 end %}}}
-return
+
 % Extra transient
 if perform(org,'Transient200'),% {{{
 
